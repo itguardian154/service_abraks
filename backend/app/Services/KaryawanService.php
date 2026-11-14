@@ -59,7 +59,7 @@ class KaryawanService
         }
 
         // Apply limit validation (minimum 1, maximum 200)
-        $limit = max(1, min($limit, 200));
+        $limit = max(1, min($limit, 1000));
 
         // Slice results
         $karyawan = array_slice($karyawan, 0, $limit);

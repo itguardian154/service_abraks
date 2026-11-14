@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -57,32 +58,100 @@ class AuthController extends Controller
         ], 'Registrasi berhasil');
     }
 
-    // ✅ LOGIN
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
-        ]);
+    // // ✅ LOGIN
+    // public function login(Request $request)
+    // {
+    //     $request->validate([
+    //         'email'    => 'required|email',
+    //         'password' => 'required',
+    //     ]);
 
-        $result = $this->authService->authenticate(
-            $request->email,
-            $request->password,
-            'it-asset-token',
-            'frontend',
-            $request->ip(),
-            $request->userAgent()
-        );
+    //     $result = $this->authService->authenticate(
+    //         $request->email,
+    //         $request->password,
+    //         'it-asset-token',
+    //         'frontend',
+    //         $request->ip(),
+    //         $request->userAgent()
+    //     );
 
-        if (!$result['success']) {
-            return $this->errorResponse($result['message'], 401);
+    //     if (!$result['success']) {
+    //         return $this->errorResponse($result['message'], 401);
+    //     }
+
+    //     return $this->successResponse([
+    //         'user'  => $result['user'],
+    //         'token' => $result['token'],
+    //     ], 'Login berhasil');
+    // }
+
+    // LOGIN + AUTO REGISTER
+public function login(Request $request)
+{
+    $request->validate([
+        'email'    => 'required|email',
+        'password' => 'required|string',
+    ]);
+
+    // Cek apakah user sudah terdaftar
+    $user = User::where('email', $request->email)->first();
+
+    // Jika belum terdaftar, lakukan auto register
+    if (!$user) {
+
+        // Format email harus 4 digit@gmail.com
+        if (!preg_match('/^(\d{4})@gmail\.com$/i', $request->email, $matches)) {
+            return $this->errorResponse(
+                'Email belum terdaftar dan harus menggunakan format 4 digit@gmail.com',
+                401
+            );
         }
 
-        return $this->successResponse([
-            'user'  => $result['user'],
-            'token' => $result['token'],
-        ], 'Login berhasil');
+        $fourDigit = $matches[1];
+
+        // Password default = 4 digit + 4 digit
+        $defaultPassword = $fourDigit . $fourDigit;
+
+        // Validasi password default
+        if ($request->password !== $defaultPassword) {
+            return $this->errorResponse(
+                'Password untuk registrasi otomatis tidak sesuai',
+                401
+            );
+        }
+
+        // Buat user baru
+        $user = DB::transaction(function () use ($fourDigit, $request, $defaultPassword) {
+
+            return User::firstOrCreate(
+                ['email' => $request->email],
+                [
+                    'name'     => $fourDigit,
+                    'password' => Hash::make($defaultPassword),
+                ]
+            );
+        });
     }
+
+    // Proses autentikasi
+    $result = $this->authService->authenticate(
+        $request->email,
+        $request->password,
+        'it-asset-token',
+        'frontend',
+        $request->ip(),
+        $request->userAgent()
+    );
+
+    if (!$result['success']) {
+        return $this->errorResponse($result['message'], 401);
+    }
+
+    return $this->successResponse([
+        'user'  => $result['user'],
+        'token' => $result['token'],
+    ], 'Login berhasil');
+}
 
     // ✅ LOGOUT
     public function logout(Request $request)

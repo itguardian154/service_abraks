@@ -25,7 +25,8 @@ class KaryawanController extends Controller
     {
         try {
             $search = $request->get('search');
-            $limit = (int) $request->get('limit', 20);
+            // $limit = (int) $request->get('limit', 20);
+            $limit = 1000; // Default limit to 1000, can be adjusted as needed
 
             $result = $this->karyawanService->getKaryawan($search, $limit);
 
